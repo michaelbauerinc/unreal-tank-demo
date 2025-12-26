@@ -1,0 +1,41 @@
+# Unreal Engine .gitignore
+
+# Compiled binaries
+Binaries/
+Intermediate/
+
+# Build artifacts
+Build/
+DerivedDataCache/
+
+# Saved data (local settings, autosaves, logs)
+Saved/
+
+# External actors/objects (Unreal's World Partition system)
+Content/__ExternalActors__/
+Content/__ExternalObjects__/
+
+# IDE/Editor files
+.vs/
+.vscode/
+*.xcworkspace/
+*.xcodeproj/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Visual Studio
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Crashlytics
+crashlytics-build.properties
+
+# Local user settings
+*.DotSettings.user
