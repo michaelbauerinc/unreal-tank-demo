@@ -1,8 +1,11 @@
 #include "TankProjectile.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Engine/DamageEvents.h"
+#include "Engine/OverlapResult.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Kismet/GameplayStatics.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
@@ -89,21 +92,47 @@ void ATankProjectile::Tick(float DeltaTime)
 void ATankProjectile::Explode(const FVector& Location)
 {
 	UWorld* World = GetWorld();
-	if (World && ExplosionEffect)
+	if (!World) return;
+
+	// Find all actors in explosion radius using overlap
+	TArray<FOverlapResult> Overlaps;
+	FCollisionShape Sphere = FCollisionShape::MakeSphere(ExplosionRadius);
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	Params.AddIgnoredActor(GetOwner());
+
+	if (World->OverlapMultiByChannel(Overlaps, Location, FQuat::Identity, ECC_WorldDynamic, Sphere, Params))
 	{
-		// Spawn Niagara explosion effect
+		TSet<AActor*> DamagedActors;  // Avoid damaging same actor twice
+		
+		for (const FOverlapResult& Overlap : Overlaps)
+		{
+			AActor* HitActor = Overlap.GetActor();
+			if (HitActor && !DamagedActors.Contains(HitActor))
+			{
+				DamagedActors.Add(HitActor);
+				
+				// Apply damage directly
+				FDamageEvent DamageEvent;
+				HitActor->TakeDamage(ExplosionDamage, DamageEvent, 
+					GetOwner() ? GetOwner()->GetInstigatorController() : nullptr, this);
+			}
+		}
+	}
+
+	// Spawn Niagara explosion effect
+	if (ExplosionEffect)
+	{
 		UNiagaraComponent* ExplosionComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			World,
 			ExplosionEffect,
 			Location,
 			FRotator::ZeroRotator,
-			FVector(1.5f),  // Scale up slightly for impact
-			true,           // Auto destroy
-			true,           // Auto activate
+			FVector(1.5f),
+			true, true,
 			ENCPoolMethod::None
 		);
 
-		// Deactivate after 1.5 seconds so it fades out naturally
 		if (ExplosionComp)
 		{
 			FTimerHandle TimerHandle;

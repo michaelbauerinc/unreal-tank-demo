@@ -43,6 +43,12 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	float LifeTime = 5.f;
 
+	UPROPERTY(EditDefaultsOnly)
+	float ExplosionDamage = 100.f;
+
+	UPROPERTY(EditDefaultsOnly)
+	float ExplosionRadius = 400.f;
+
 	float Age = 0.f;
 	FVector PrevLocation;
 };
