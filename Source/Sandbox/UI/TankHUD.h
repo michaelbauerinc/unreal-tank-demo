@@ -5,7 +5,7 @@
 #include "TankHUD.generated.h"
 
 /**
- * Minimal HUD - 3D reticle on tank handles aiming.
+ * Tank HUD - fixed crosshair at screen center.
  */
 UCLASS()
 class SANDBOX_API ATankHUD : public AHUD
@@ -14,4 +14,7 @@ class SANDBOX_API ATankHUD : public AHUD
 
 public:
 	virtual void DrawHUD() override;
+
+private:
+	void DrawCrosshairAt(float X, float Y);
 };

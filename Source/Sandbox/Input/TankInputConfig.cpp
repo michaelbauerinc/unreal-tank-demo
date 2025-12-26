@@ -16,6 +16,9 @@ void UTankInputConfig::Setup()
 	LookAction = NewObject<UInputAction>(this, TEXT("IA_Look"));
 	LookAction->ValueType = EInputActionValueType::Axis2D;
 
+	FireAction = NewObject<UInputAction>(this, TEXT("IA_Fire"));
+	FireAction->ValueType = EInputActionValueType::Boolean;
+
 	// === MAPPING CONTEXT ===
 	MappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Tank"));
 
@@ -36,6 +39,11 @@ void UTankInputConfig::Setup()
 	// Mouse for look
 	{
 		MappingContext->MapKey(LookAction, EKeys::Mouse2D);
+	}
+
+	// Left mouse for fire
+	{
+		MappingContext->MapKey(FireAction, EKeys::LeftMouseButton);
 	}
 }
 

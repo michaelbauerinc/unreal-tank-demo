@@ -1,6 +1,7 @@
 #include "TankPawn.h"
 #include "Components/TankBodyComponent.h"
 #include "Input/TankInputConfig.h"
+#include "Projectiles/TankProjectile.h"
 #include "Components/BoxComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
@@ -33,8 +34,9 @@ ATankPawn::ATankPawn()
 	// === CAMERA ===
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(Chassis);
-	CameraBoom->TargetArmLength = 1200.f;  // Further back for bigger tank
+	CameraBoom->TargetArmLength = 1200.f;
 	CameraBoom->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
+	CameraBoom->SocketOffset = FVector(0.f, 0.f, 200.f);  // Camera higher, looks down at tank
 	CameraBoom->bDoCollisionTest = true;
 	CameraBoom->bUsePawnControlRotation = false;
 	CameraBoom->bInheritPitch = false;
@@ -57,6 +59,12 @@ void ATankPawn::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	ApplyMovement();
 	UpdateTurret();
+
+	// Fire cooldown
+	if (FireCooldown > 0.f)
+	{
+		FireCooldown -= DeltaTime;
+	}
 
 	// Tread animation from input (consistent speed regardless of terrain)
 	float TreadForward = ThrottleInput * 1000.f;  // Constant rate based on input
@@ -111,16 +119,12 @@ void ATankPawn::ApplyMovement()
 
 void ATankPawn::UpdateTurret()
 {
-	// Camera follows aim
+	// Camera follows aim (absolute world rotation)
 	CameraBoom->SetWorldRotation(FRotator(AimPitch, AimYaw, 0.f));
 
-	// Turret tracks aim
-	TankBody->SetTurretYaw(AimYaw);
-
-	// Barrel elevation
-	float BarrelPitch = FMath::GetMappedRangeValueClamped(
-		FVector2D(-50.f, 0.f), FVector2D(20.f, -5.f), AimPitch);
-	TankBody->SetBarrelPitch(BarrelPitch);
+	// Turret aims same direction as camera
+	// AimPitch is negative when looking up (camera convention), barrel pitch is positive when elevated
+	TankBody->SetTurretAim(AimYaw, -AimPitch);
 }
 
 void ATankPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -145,6 +149,7 @@ void ATankPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 		EIC->BindAction(InputConfig->TurnAction, ETriggerEvent::Triggered, this, &ATankPawn::HandleTurn);
 		EIC->BindAction(InputConfig->TurnAction, ETriggerEvent::Completed, this, &ATankPawn::HandleTurn);
 		EIC->BindAction(InputConfig->LookAction, ETriggerEvent::Triggered, this, &ATankPawn::HandleLook);
+		EIC->BindAction(InputConfig->FireAction, ETriggerEvent::Started, this, &ATankPawn::HandleFire);
 	}
 }
 
@@ -163,4 +168,32 @@ void ATankPawn::HandleLook(const FInputActionValue& Value)
 	FVector2D Input = Value.Get<FVector2D>();
 	AimYaw = FMath::UnwindDegrees(AimYaw + Input.X * 0.5f);
 	AimPitch = FMath::Clamp(AimPitch - Input.Y * 0.5f, -50.f, 0.f);
+}
+
+void ATankPawn::HandleFire(const FInputActionValue& Value)
+{
+	if (FireCooldown <= 0.f)
+	{
+		Fire();
+		FireCooldown = FireRate;
+	}
+}
+
+void ATankPawn::Fire()
+{
+	if (!TankBody) return;
+
+	// Fire direction matches camera/crosshair (screen center)
+	FRotator AimRot(AimPitch, AimYaw, 0.f);
+	FVector FireDir = AimRot.Vector();
+	
+	// Spawn from muzzle location
+	FVector MuzzlePos = TankBody->GetMuzzleLocation();
+	FVector SpawnPos = MuzzlePos + FireDir * 50.f;
+
+	FActorSpawnParameters Params;
+	Params.Owner = this;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	GetWorld()->SpawnActor<ATankProjectile>(ATankProjectile::StaticClass(), SpawnPos, AimRot, Params);
 }

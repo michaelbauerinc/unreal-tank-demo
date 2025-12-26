@@ -9,7 +9,9 @@ class UMaterialInstanceDynamic;
 
 /**
  * Visual tank assembly - hull, turret, barrel, animated treads.
- * All meshes have collision disabled (physics handled by parent).
+ * 
+ * Turret sits on hull and tilts with terrain, but yaw is controlled by aim.
+ * Barrel elevates relative to turret based on aim pitch.
  */
 UCLASS()
 class SANDBOX_API UTankBodyComponent : public USceneComponent
@@ -19,10 +21,13 @@ class SANDBOX_API UTankBodyComponent : public USceneComponent
 public:
 	UTankBodyComponent();
 
-	void SetTurretYaw(float WorldYaw);
-	void SetBarrelPitch(float Pitch);
+	// Set turret aim - yaw is world-space, pitch is elevation (0-50 degrees up)
+	void SetTurretAim(float WorldYaw, float Pitch);
+	
 	void UpdateTreads(float ForwardSpeed, float TurnRate);
+	
 	FVector GetMuzzleLocation() const;
+	FVector GetMuzzleDirection() const;
 
 private:
 	void CreateTreadSegments(bool bLeftSide, UStaticMesh* Mesh);
@@ -46,7 +51,7 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	UStaticMeshComponent* Barrel;
 
-	// Tread segments (conveyor belt style)
+	// Treads
 	static constexpr int32 TreadSegments = 16;
 	
 	UPROPERTY()
@@ -65,15 +70,19 @@ private:
 	UPROPERTY()
 	UMaterialInstanceDynamic* BarrelMat;
 
-	// Tread animation
+	// Tread animation state
 	float LeftTreadOffset = 0.f;
 	float RightTreadOffset = 0.f;
 	float SmoothedLeftSpeed = 0.f;
 	float SmoothedRightSpeed = 0.f;
 
-	// Tread geometry constants
+	// Tread geometry
 	const float TreadLength = 280.f;
 	const float TreadY = 90.f;
 	const float TreadTopZ = 15.f;
 	const float TreadBottomZ = -15.f;
+
+	// Aim state (for muzzle direction calculation)
+	float AimYaw = 0.f;
+	float AimPitch = 0.f;
 };

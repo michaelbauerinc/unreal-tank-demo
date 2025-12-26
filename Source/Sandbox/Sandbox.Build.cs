@@ -20,7 +20,8 @@ public class Sandbox : ModuleRules
 			"Sandbox/Pawns",
 			"Sandbox/Components",
 			"Sandbox/Input",
-			"Sandbox/UI"
+			"Sandbox/UI",
+			"Sandbox/Projectiles"
 		});
 	}
 }

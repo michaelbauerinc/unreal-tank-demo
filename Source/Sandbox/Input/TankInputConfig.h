@@ -29,6 +29,9 @@ public:
 	UPROPERTY()
 	UInputAction* LookAction;
 
+	UPROPERTY()
+	UInputAction* FireAction;
+
 private:
 	UPROPERTY()
 	UInputMappingContext* MappingContext;

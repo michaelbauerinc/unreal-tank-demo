@@ -6,9 +6,15 @@ void ATankHUD::DrawHUD()
 	Super::DrawHUD();
 	if (!Canvas) return;
 
+	// Fixed crosshair at screen center
 	float CX = Canvas->SizeX * 0.5f;
-	float CY = Canvas->SizeY * 0.4f;  // 40% from top (higher on screen)
+	float CY = Canvas->SizeY * 0.5f;
 
+	DrawCrosshairAt(CX, CY);
+}
+
+void ATankHUD::DrawCrosshairAt(float CX, float CY)
+{
 	FLinearColor Green(0.2f, 1.f, 0.2f, 0.9f);
 	float Size = 20.f;
 	float Gap = 6.f;

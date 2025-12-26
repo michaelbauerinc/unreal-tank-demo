@@ -62,6 +62,12 @@ private:
 	float ThrottleInput = 0.f;
 	float TurnInput = 0.f;
 
+	// Firing
+	float FireCooldown = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "Tank|Combat")
+	float FireRate = 0.5f;
+
 	// Tuning
 	UPROPERTY(EditAnywhere, Category = "Tank|Movement")
 	float DriveForce = 8000000.f;  // 2x+ for bigger tank
@@ -76,8 +82,10 @@ private:
 	void HandleMove(const FInputActionValue& Value);
 	void HandleTurn(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
+	void HandleFire(const FInputActionValue& Value);
 
 	// Update functions
 	void ApplyMovement();
 	void UpdateTurret();
+	void Fire();
 };

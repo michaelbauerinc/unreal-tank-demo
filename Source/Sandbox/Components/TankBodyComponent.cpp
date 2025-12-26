@@ -39,13 +39,14 @@ UTankBodyComponent::UTankBodyComponent()
 	Hull->SetRelativeLocation(FVector(0.f, 0.f, 20.f));
 
 	// === TREAD SEGMENTS ===
-	CreateTreadSegments(true, Cube);   // Left
-	CreateTreadSegments(false, Cube);  // Right
+	CreateTreadSegments(true, Cube);
+	CreateTreadSegments(false, Cube);
 
-	// === TURRET ===
+	// === TURRET (attached to hull, rotates with it, but yaw controlled separately) ===
 	TurretPivot = CreateDefaultSubobject<USceneComponent>(TEXT("TurretPivot"));
 	TurretPivot->SetupAttachment(this);
 	TurretPivot->SetRelativeLocation(FVector(-10.f, 0.f, 45.f));
+	// NO absolute rotation - turret tilts with hull
 
 	Turret = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Turret"));
 	Turret->SetupAttachment(TurretPivot);
@@ -103,67 +104,62 @@ void UTankBodyComponent::UpdateTreadPositions(bool bLeftSide)
 		float Dist = T * Perimeter;
 
 		FVector Pos;
-		// All segments stay horizontal (no rotation)
-
 		if (Dist < TreadLength)
 		{
-			// Top (moving forward)
 			Pos = FVector(-HalfLen + Dist, Y, TreadTopZ);
 		}
 		else if (Dist < TreadLength + Height)
 		{
-			// Front curve (moving down) - segments stay at front X, interpolate Z
 			float D = Dist - TreadLength;
 			float Alpha = D / Height;
 			Pos = FVector(HalfLen, Y, FMath::Lerp(TreadTopZ, TreadBottomZ, Alpha));
 		}
 		else if (Dist < TreadLength * 2.f + Height)
 		{
-			// Bottom (moving backward)
 			float D = Dist - TreadLength - Height;
 			Pos = FVector(HalfLen - D, Y, TreadBottomZ);
 		}
 		else
 		{
-			// Back curve (moving up) - segments stay at back X, interpolate Z
 			float D = Dist - TreadLength * 2.f - Height;
 			float Alpha = D / Height;
 			Pos = FVector(-HalfLen, Y, FMath::Lerp(TreadBottomZ, TreadTopZ, Alpha));
 		}
 
 		Treads[i]->SetRelativeLocation(Pos);
-		Treads[i]->SetRelativeRotation(FRotator::ZeroRotator); // Always horizontal
+		Treads[i]->SetRelativeRotation(FRotator::ZeroRotator);
 	}
 }
 
-void UTankBodyComponent::SetTurretYaw(float WorldYaw)
+void UTankBodyComponent::SetTurretAim(float WorldYaw, float Pitch)
 {
+	AimYaw = WorldYaw;
+	AimPitch = FMath::Clamp(Pitch, 0.f, 50.f);
+
 	if (TurretPivot)
 	{
-		float LocalYaw = WorldYaw - GetComponentRotation().Yaw;
-		TurretPivot->SetRelativeRotation(FRotator(0.f, LocalYaw, 0.f));
+		// Turret yaw is relative to hull - compute offset from hull's world yaw
+		float HullYaw = GetComponentRotation().Yaw;
+		float RelativeYaw = WorldYaw - HullYaw;
+		TurretPivot->SetRelativeRotation(FRotator(0.f, RelativeYaw, 0.f));
 	}
-}
 
-void UTankBodyComponent::SetBarrelPitch(float Pitch)
-{
 	if (BarrelPivot)
 	{
-		BarrelPivot->SetRelativeRotation(FRotator(FMath::Clamp(Pitch, -10.f, 25.f), 0.f, 0.f));
+		// Barrel pitch is relative to turret
+		BarrelPivot->SetRelativeRotation(FRotator(-AimPitch, 0.f, 0.f));
 	}
 }
 
 void UTankBodyComponent::UpdateTreads(float ForwardSpeed, float TurnRate)
 {
-	// Smooth the input speeds to prevent jerky animation
-	float SmoothRate = 0.1f;
 	float TargetLeftSpeed = ForwardSpeed + TurnRate;
 	float TargetRightSpeed = ForwardSpeed - TurnRate;
 	
 	SmoothedLeftSpeed = FMath::FInterpTo(SmoothedLeftSpeed, TargetLeftSpeed, GetWorld()->GetDeltaSeconds(), 8.f);
 	SmoothedRightSpeed = FMath::FInterpTo(SmoothedRightSpeed, TargetRightSpeed, GetWorld()->GetDeltaSeconds(), 8.f);
 	
-	float Rate = 0.0002f;  // Half speed
+	float Rate = 0.0002f;
 	LeftTreadOffset = FMath::Fmod(LeftTreadOffset + SmoothedLeftSpeed * Rate + 1.f, 1.f);
 	RightTreadOffset = FMath::Fmod(RightTreadOffset + SmoothedRightSpeed * Rate + 1.f, 1.f);
 
@@ -173,9 +169,17 @@ void UTankBodyComponent::UpdateTreads(float ForwardSpeed, float TurnRate)
 
 FVector UTankBodyComponent::GetMuzzleLocation() const
 {
-	if (BarrelPivot)
+	if (Barrel)
 	{
-		return BarrelPivot->GetComponentLocation() + BarrelPivot->GetForwardVector() * 90.f;
+		float Scale = GetComponentScale().X;
+		return Barrel->GetComponentLocation() + GetMuzzleDirection() * 90.f * Scale;
 	}
-	return GetComponentLocation();
+	return GetComponentLocation() + GetForwardVector() * 300.f;
+}
+
+FVector UTankBodyComponent::GetMuzzleDirection() const
+{
+	// Direction matches stored aim (same as camera direction)
+	FRotator AimRot(AimPitch, AimYaw, 0.f);
+	return AimRot.Vector();
 }
