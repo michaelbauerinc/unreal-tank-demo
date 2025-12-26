@@ -6,6 +6,7 @@
 
 class UProjectileMovementComponent;
 class UStaticMeshComponent;
+class UNiagaraSystem;
 
 /**
  * Simple tank shell - flies forward, explodes on hit.
@@ -31,6 +32,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	UProjectileMovementComponent* Movement;
+
+	// Explosion VFX from Vefects pack
+	UPROPERTY()
+	UNiagaraSystem* ExplosionEffect;
 
 	UPROPERTY(EditDefaultsOnly)
 	float Speed = 8000.f;

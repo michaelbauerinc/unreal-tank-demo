@@ -12,7 +12,8 @@ public class Sandbox : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
-			"PhysicsCore"
+			"PhysicsCore",
+			"Niagara"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

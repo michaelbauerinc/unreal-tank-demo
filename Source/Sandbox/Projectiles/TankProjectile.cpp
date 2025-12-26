@@ -3,7 +3,9 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "DrawDebugHelpers.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 
 ATankProjectile::ATankProjectile()
 {
@@ -12,6 +14,14 @@ ATankProjectile::ATankProjectile()
 	// Simple visible mesh - no collision, just visual
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
 		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+
+	// Load explosion effect from Vefects pack
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ExplosionFX(
+		TEXT("/Game/Vefects/Free_Fire/Shared/Particles/NS_Fire_Big_Smoke.NS_Fire_Big_Smoke"));
+	if (ExplosionFX.Succeeded())
+	{
+		ExplosionEffect = ExplosionFX.Object;
+	}
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -79,13 +89,32 @@ void ATankProjectile::Tick(float DeltaTime)
 void ATankProjectile::Explode(const FVector& Location)
 {
 	UWorld* World = GetWorld();
-	if (World)
+	if (World && ExplosionEffect)
 	{
-		// Visual explosion - layered debug spheres
-		DrawDebugSphere(World, Location, 50.f, 16, FColor::White, false, 0.3f, 0, 4.f);
-		DrawDebugSphere(World, Location, 120.f, 16, FColor::Yellow, false, 0.6f, 0, 3.f);
-		DrawDebugSphere(World, Location, 200.f, 12, FColor::Orange, false, 0.9f, 0, 2.f);
-		DrawDebugSphere(World, Location, 280.f, 10, FColor::Red, false, 1.2f, 0, 1.f);
+		// Spawn Niagara explosion effect
+		UNiagaraComponent* ExplosionComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			World,
+			ExplosionEffect,
+			Location,
+			FRotator::ZeroRotator,
+			FVector(1.5f),  // Scale up slightly for impact
+			true,           // Auto destroy
+			true,           // Auto activate
+			ENCPoolMethod::None
+		);
+
+		// Deactivate after 1.5 seconds so it fades out naturally
+		if (ExplosionComp)
+		{
+			FTimerHandle TimerHandle;
+			World->GetTimerManager().SetTimer(TimerHandle, [ExplosionComp]()
+			{
+				if (ExplosionComp && ExplosionComp->IsValidLowLevel())
+				{
+					ExplosionComp->Deactivate();
+				}
+			}, 1.5f, false);
+		}
 	}
 
 	Destroy();
