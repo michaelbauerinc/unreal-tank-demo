@@ -8,6 +8,5 @@ AWoodenCrate::AWoodenCrate()
 	DebrisScale = 0.35f;
 	DebrisForce = 600.f;
 	DebrisColor = FLinearColor(0.55f, 0.35f, 0.15f);  // Wood brown
-
-	SetActorScale3D(FVector(1.f, 1.f, 1.f));
+	// Note: Scale is default 1,1,1 - no need to set explicitly
 }

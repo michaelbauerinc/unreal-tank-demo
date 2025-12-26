@@ -24,17 +24,12 @@ ADestructibleTarget::ADestructibleTarget()
 		DestructionEffect = FireFX.Object;
 	}
 
-	// Default mesh - cube
+	// Default mesh - cube (collision setup deferred to BeginPlay to avoid CDO issues)
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	if (CubeMesh)
 	{
 		Mesh->SetStaticMesh(CubeMesh);
 	}
-	Mesh->SetSimulatePhysics(false);
-	Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Mesh->SetCollisionObjectType(ECC_WorldDynamic);
-	Mesh->SetCollisionResponseToAllChannels(ECR_Block);
-	Mesh->SetGenerateOverlapEvents(true);
 	RootComponent = Mesh;
 }
 
@@ -42,6 +37,16 @@ void ADestructibleTarget::BeginPlay()
 {
 	Super::BeginPlay();
 	CurrentHealth = MaxHealth;
+
+	// Setup collision (deferred from constructor to avoid CDO physics issues)
+	if (Mesh)
+	{
+		Mesh->SetSimulatePhysics(false);
+		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Mesh->SetCollisionObjectType(ECC_WorldDynamic);
+		Mesh->SetCollisionResponseToAllChannels(ECR_Block);
+		Mesh->SetGenerateOverlapEvents(true);
+	}
 
 	// Apply color
 	if (Mesh && BaseMaterial)

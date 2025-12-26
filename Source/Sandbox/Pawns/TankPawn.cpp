@@ -13,16 +13,10 @@ ATankPawn::ATankPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// === PHYSICS CHASSIS ===
+	// === PHYSICS CHASSIS (physics setup deferred to BeginPlay) ===
 	Chassis = CreateDefaultSubobject<UBoxComponent>(TEXT("Chassis"));
 	Chassis->SetBoxExtent(FVector(300.f, 200.f, 60.f));  // 2x size
 	Chassis->SetCollisionProfileName(TEXT("Pawn"));
-	Chassis->SetSimulatePhysics(true);
-	Chassis->SetEnableGravity(true);
-	Chassis->SetMassOverrideInKg(NAME_None, 8000.f);  // Heavier for bigger tank
-	Chassis->SetLinearDamping(2.f);
-	Chassis->SetAngularDamping(2.f);
-	Chassis->SetCenterOfMass(FVector(0.f, 0.f, -80.f));  // Lower CoM for stability
 	RootComponent = Chassis;
 
 	// === TANK BODY (visuals only) ===
@@ -52,6 +46,17 @@ void ATankPawn::BeginPlay()
 {
 	Super::BeginPlay();
 	AimYaw = GetActorRotation().Yaw;
+
+	// Setup physics (deferred from constructor to avoid CDO issues)
+	if (Chassis)
+	{
+		Chassis->SetSimulatePhysics(true);
+		Chassis->SetEnableGravity(true);
+		Chassis->SetMassOverrideInKg(NAME_None, 8000.f);
+		Chassis->SetLinearDamping(2.f);
+		Chassis->SetAngularDamping(2.f);
+		Chassis->SetCenterOfMass(FVector(0.f, 0.f, -80.f));
+	}
 }
 
 void ATankPawn::Tick(float DeltaTime)

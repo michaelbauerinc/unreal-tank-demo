@@ -31,9 +31,6 @@ AExplosiveBarrel::AExplosiveBarrel()
 	DebrisScale = 0.25f;
 	DebrisForce = 1200.f;
 	DebrisColor = FLinearColor(0.6f, 0.15f, 0.1f);  // Reddish barrel color
-
-	// Scale to barrel proportions
-	SetActorScale3D(FVector(0.8f, 0.8f, 1.2f));
 }
 
 void AExplosiveBarrel::OnDestroyed()
