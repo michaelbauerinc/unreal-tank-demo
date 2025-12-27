@@ -31,10 +31,18 @@ AExplosiveBarrel::AExplosiveBarrel()
 	DebrisScale = 0.25f;
 	DebrisForce = 1200.f;
 	DebrisColor = FLinearColor(0.6f, 0.15f, 0.1f);  // Reddish barrel color
+	MaxBreakDepth = 2;  // Barrel debris breaks fewer times
 }
 
 void AExplosiveBarrel::OnDestroyed()
 {
+	// Only do big explosion for original barrel, not debris
+	if (CurrentBreakDepth > 0)
+	{
+		Super::OnDestroyed();
+		return;
+	}
+
 	UWorld* World = GetWorld();
 	FVector Location = GetActorLocation();
 

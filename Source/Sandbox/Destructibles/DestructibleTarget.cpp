@@ -24,7 +24,6 @@ ADestructibleTarget::ADestructibleTarget()
 		DestructionEffect = FireFX.Object;
 	}
 
-	// Default mesh - cube (collision setup deferred to BeginPlay to avoid CDO issues)
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	if (CubeMesh)
 	{
@@ -38,10 +37,9 @@ void ADestructibleTarget::BeginPlay()
 	Super::BeginPlay();
 	CurrentHealth = MaxHealth;
 
-	// Setup collision (deferred from constructor to avoid CDO physics issues)
 	if (Mesh)
 	{
-		Mesh->SetSimulatePhysics(false);
+		Mesh->SetSimulatePhysics(CurrentBreakDepth > 0);  // Debris has physics
 		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		Mesh->SetCollisionObjectType(ECC_WorldDynamic);
 		Mesh->SetCollisionResponseToAllChannels(ECR_Block);
@@ -57,6 +55,17 @@ void ADestructibleTarget::BeginPlay()
 	}
 }
 
+void ADestructibleTarget::SetDebrisMode(float Scale, const FLinearColor& Color, float Health)
+{
+	DebrisScale = Scale;
+	DebrisColor = Color;
+	MaxHealth = Health;
+	
+	// Fewer debris pieces as we get smaller
+	DebrisCount = FMath::Max(2, DebrisCount / 2);
+	DebrisForce *= 0.6f;
+}
+
 float ADestructibleTarget::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 	AController* EventInstigator, AActor* DamageCauser)
 {
@@ -66,7 +75,6 @@ float ADestructibleTarget::TakeDamage(float DamageAmount, FDamageEvent const& Da
 
 	if (CurrentHealth <= 0.f)
 	{
-		// Get impact direction from damage causer
 		FVector ImpactDir = FVector::ZeroVector;
 		if (DamageCauser)
 		{
@@ -83,20 +91,21 @@ float ADestructibleTarget::TakeDamage(float DamageAmount, FDamageEvent const& Da
 
 void ADestructibleTarget::OnDestroyed()
 {
-	// Spawn fire effect
-	if (DestructionEffect)
+	// Only spawn fire effect for original objects or first break
+	if (DestructionEffect && CurrentBreakDepth <= 1)
 	{
+		float EffectScale = CurrentBreakDepth == 0 ? 1.f : 0.5f;
+		
 		UNiagaraComponent* FireComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			GetWorld(),
 			DestructionEffect,
 			GetActorLocation(),
 			FRotator::ZeroRotator,
-			FVector(1.f),
+			FVector(EffectScale),
 			true, true,
 			ENCPoolMethod::None
 		);
 
-		// Auto-deactivate after short duration
 		if (FireComp)
 		{
 			FTimerHandle TimerHandle;
@@ -113,61 +122,65 @@ void ADestructibleTarget::OnDestroyed()
 
 void ADestructibleTarget::SpawnDebris(const FVector& ImpactDir)
 {
+	// Don't spawn more debris if we've reached max break depth
+	if (CurrentBreakDepth >= MaxBreakDepth) return;
 	if (!CubeMesh || !BaseMaterial) return;
 
 	UWorld* World = GetWorld();
 	FVector Origin = GetActorLocation();
 	FVector ActorScale = GetActorScale3D();
-	FVector DebrisScaleVec = ActorScale * DebrisScale;
+
+	// Calculate new debris scale (each break makes pieces ~40% smaller)
+	float NewScale = (CurrentBreakDepth == 0) ? DebrisScale : DebrisScale * 0.5f;
+	float NewHealth = MaxHealth * 0.3f;  // Debris is weaker
 
 	for (int32 i = 0; i < DebrisCount; i++)
 	{
-		// Random offset from center of destroyed object
 		FVector Offset = FMath::VRand() * 30.f * ActorScale.GetMax();
 		FVector SpawnLoc = Origin + Offset;
-		FRotator SpawnRot = FRotator(FMath::RandRange(0.f, 360.f), FMath::RandRange(0.f, 360.f), FMath::RandRange(0.f, 360.f));
+		FRotator SpawnRot = FRotator(FMath::RandRange(0.f, 360.f), FMath::RandRange(0.f, 360.f), 0.f);
 
-		// Create debris actor at the correct location
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		
-		AActor* Debris = World->SpawnActor<AActor>(AActor::StaticClass(), SpawnLoc, SpawnRot, Params);
+		// Spawn a new DestructibleTarget as debris
+		ADestructibleTarget* Debris = World->SpawnActor<ADestructibleTarget>(
+			GetClass(),  // Use same class (or base class for subclasses)
+			SpawnLoc, 
+			SpawnRot, 
+			Params
+		);
+		
 		if (!Debris) continue;
 
-		// Add mesh component
-		UStaticMeshComponent* DebrisMesh = NewObject<UStaticMeshComponent>(Debris);
-		DebrisMesh->SetStaticMesh(CubeMesh);
-		DebrisMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		DebrisMesh->SetCollisionProfileName(TEXT("PhysicsActor"));
-		Debris->SetRootComponent(DebrisMesh);
-		DebrisMesh->RegisterComponent();
+		// Configure as debris
+		Debris->SetBreakDepth(CurrentBreakDepth + 1);
 		
-		// Set transform after registration
-		DebrisMesh->SetWorldLocation(SpawnLoc);
-		DebrisMesh->SetWorldRotation(SpawnRot);
-		DebrisMesh->SetWorldScale3D(DebrisScaleVec * FMath::RandRange(0.5f, 1.2f));
-
-		// Apply material with slight color variation
-		UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(BaseMaterial, Debris);
+		// Vary the color slightly
 		float Variation = FMath::RandRange(0.8f, 1.2f);
-		Mat->SetVectorParameterValue(TEXT("Color"), DebrisColor * Variation);
-		DebrisMesh->SetMaterial(0, Mat);
+		FLinearColor VariedColor = DebrisColor * Variation;
+		
+		Debris->SetDebrisMode(NewScale, VariedColor, NewHealth);
+		
+		// Set scale
+		float ScaleVariation = FMath::RandRange(0.7f, 1.3f);
+		Debris->SetActorScale3D(ActorScale * NewScale * ScaleVariation);
 
-		// Enable physics after setup
-		DebrisMesh->SetSimulatePhysics(true);
-
-		// Apply impulse - outward + upward + impact direction
+		// Apply impulse after a tiny delay to let physics initialize
+		FTimerHandle ImpulseTimer;
 		FVector Impulse = FMath::VRand();
-		Impulse.Z = FMath::Abs(Impulse.Z) + 0.5f; // Bias upward
+		Impulse.Z = FMath::Abs(Impulse.Z) + 0.5f;
 		Impulse = Impulse.GetSafeNormal() * DebrisForce;
-		Impulse += ImpactDir * DebrisForce * 0.5f; // Add impact direction
-		DebrisMesh->AddImpulse(Impulse, NAME_None, true);
-
-		// Random spin
-		FVector Torque = FMath::VRand() * 100.f;
-		DebrisMesh->AddAngularImpulseInDegrees(Torque, NAME_None, true);
-
-		// Auto-destroy after delay
-		Debris->SetLifeSpan(5.f);
+		Impulse += ImpactDir * DebrisForce * 0.5f;
+		
+		World->GetTimerManager().SetTimer(ImpulseTimer, [Debris, Impulse]()
+		{
+			if (Debris && Debris->Mesh)
+			{
+				Debris->Mesh->SetSimulatePhysics(true);
+				Debris->Mesh->AddImpulse(Impulse, NAME_None, true);
+				Debris->Mesh->AddAngularImpulseInDegrees(FMath::VRand() * 100.f, NAME_None, true);
+			}
+		}, 0.01f, false);
 	}
 }

@@ -8,5 +8,5 @@ AWoodenCrate::AWoodenCrate()
 	DebrisScale = 0.35f;
 	DebrisForce = 600.f;
 	DebrisColor = FLinearColor(0.55f, 0.35f, 0.15f);  // Wood brown
-	// Note: Scale is default 1,1,1 - no need to set explicitly
+	MaxBreakDepth = 3;  // Wood breaks into many pieces
 }
